@@ -6,14 +6,12 @@ from .answers import AnswersDB
 
 @sockets.on('chat')
 def add_chat_message(data):
-    print(data)
     room = data['room']
     data['message']['user'] = Markup.escape(data['message']['user'])
     data['message']['user_info'] = data['message']['user_info']
     data['message']['text'] = Markup.escape(data['message']['text'])
     
     if len(data['message']['text']) > 0 and len(data['message']['text']) < 800:
-        print(True)
         chat_collection.find_one_and_update({'room': room}, {'$push': {'messages': data['message']}}, {"_id": 0}, upsert=True)
         sockets.emit('add_chat_messages', [data['message']], to=room)
     
@@ -37,6 +35,11 @@ def ans_view(message):
             result['data'].append(data)
             
         sockets.emit('update_viewers', result, to=room)
+        
+@sockets.on('add_answer')
+def ans_view(data):
+    result = AnswersDB.add_user_answer(data['question'], data['answer'], data['user_info'], data['question_type'])
+    sockets.emit('update_answers', result, to=data['room'])
 
 @sockets.on('join')
 def on_join(room):
