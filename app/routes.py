@@ -20,8 +20,8 @@ def add_chat_message(data):
 @sockets.on('get_chat')
 def get_chat_messages(room):
     messages = chat_collection.find_one({'room': room}, {"_id": 0})
-    
-    sockets.emit('add_chat_messages', messages['messages'], to=room)
+    if messages is not None:
+        sockets.emit('add_chat_messages', messages['messages'], to=room)
 
 @sockets.on('view_question')
 def ans_view(message):
