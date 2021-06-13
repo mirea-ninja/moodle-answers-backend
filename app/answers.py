@@ -44,7 +44,7 @@ class AnswersDB:
         if question_db is not None:
             if user_info not in question_db['viewers']:
                 document = questions_collection.find_one_and_update({'question': question},
-                                                                    {'$push': {'viewers': [user_info]}}, 
+                                                                    {'$push': {'viewers': user_info}}, 
                                                                     {"_id": 0},
                                                                     return_document=ReturnDocument.AFTER)
                 return document
