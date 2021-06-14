@@ -26,7 +26,7 @@ def get_chat_messages(room):
 
 
 @sockets.on('view_question')
-def ans_view(message):
+def view_question(message):
     json_data = message['data']
     questions = json_data['questions']
     if len(questions) > 0:
@@ -42,9 +42,16 @@ def ans_view(message):
 
 
 @sockets.on('add_answer')
-def ans_view(data):
+def add_answer(data):
     result = AnswersDB.add_user_answer(
         data['question'], data['answer'], data['user_info'], data['question_type'])
+    sockets.emit('update_answers', result, to=data['room'])
+    
+
+@sockets.on('add_approve')
+def ans_approve(data):
+    result = AnswersDB.add_user_approve(
+        data['question'], data['answer'], data['user_info'], data['is_correct'])
     sockets.emit('update_answers', result, to=data['room'])
 
 

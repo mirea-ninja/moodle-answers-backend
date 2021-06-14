@@ -57,13 +57,14 @@ class AnswersDB:
                         {'$pull': {'answers.$.users': user_info}}, 
                         session=session
                     )
-
-                    AnswersDB.delete_empty_answers(question, session)
+                    
+                    if question_type == 'shortanswer' or question_type == 'numerical':
+                        AnswersDB.delete_empty_answers(question, session)
 
                     if AnswersDB.find_question_by_ans(question, answer, session) is None:
-                
-                        questions_collection.find_one_and_update({'question': question}, {'$push': {'answers': {'answer': answer, 'users': [user_info]}}},
-                                                                {"_id": 0}, return_document=ReturnDocument.AFTER, session=session)
+                        return questions_collection.find_one_and_update(
+                            {'question': question}, {'$push': {'answers': {'answer': answer, 'users': [user_info], 'correct': [], 'not_correct': []}}},
+                            {"_id": 0}, return_document=ReturnDocument.AFTER, session=session)
                     else:
                         return questions_collection.find_one_and_update(
                             {'question': question, 'answers.answer': answer},
@@ -78,13 +79,12 @@ class AnswersDB:
                             {'$pull': {'answers.$.users': user_info}}, {"_id": 0},
                             return_document=ReturnDocument.AFTER, session=session
                         )
-                        AnswersDB.delete_empty_answers(question, session)
                     else:
                         if AnswersDB.is_user_send_answer(question, answer[0], user_info, session) is False:
                             if AnswersDB.find_question_by_ans(question, answer[0], session) is None:
                                 result = questions_collection.find_one_and_update(
                                     {'question': question}, 
-                                    {'$push': {'answers': {'answer': answer[0], 'users': [user_info]}}}, 
+                                    {'$push': {'answers': {'answer': answer[0], 'users': [user_info], 'correct': [], 'not_correct': []}}}, 
                                     {"_id": 0}, return_document=ReturnDocument.AFTER, session=session
                                 )
                             else:
@@ -93,9 +93,53 @@ class AnswersDB:
                                     {'$push': {'answers.$.users': user_info}}, {"_id": 0},
                                     return_document=ReturnDocument.AFTER, session=session
                                 )
-
+                    if result is None:
+                        return AnswersDB.find_question(question, session)
                     return result
 
+    @staticmethod
+    def add_user_approve(question, answer, user_info, is_correct):
+        with client.start_session() as session:
+            with session.start_transaction():
+                questions_collection.update_one(
+                    {'question': question, 'answers.answer': answer},
+                    {'$pull': {'answers.$.correct': user_info}}, 
+                    session=session
+                )
+                questions_collection.update_one(
+                    {'question': question, 'answers.answer': answer},
+                    {'$pull': {'answers.$.not_correct': user_info}}, 
+                    session=session
+                )
+
+                if is_correct:
+                    if AnswersDB.find_question_by_ans(question, answer, session) is None:
+                        return questions_collection.find_one_and_update(
+                            {'question': question},
+                            {'$push': {'answers': {'answer': answer, 'users': [], 'correct': [user_info], 'not_correct': []}}}, {"_id": 0},
+                            return_document=ReturnDocument.AFTER, session=session
+                        )
+                    else:
+                        return questions_collection.find_one_and_update(
+                            {'question': question, 'answers.answer': answer},
+                            {'$push': {'answers.$.correct': user_info}}, {"_id": 0},
+                            return_document=ReturnDocument.AFTER, session=session
+                        )
+                else:
+                    if AnswersDB.find_question_by_ans(question, answer, session) is None:
+                        return questions_collection.find_one_and_update(
+                            {'question': question},
+                            {'$push': {'answers': {'answer': answer, 'users': [], 'correct': [], 'not_correct': [user_info]}}}, {"_id": 0},
+                            return_document=ReturnDocument.AFTER, session=session
+                        )
+                    else:
+                        return questions_collection.find_one_and_update(
+                            {'question': question, 'answers.answer': answer},
+                            {'$push': {'answers.$.not_correct': user_info}}, {"_id": 0},
+                            return_document=ReturnDocument.AFTER, session=session
+                        )
+
+                
     @staticmethod
     def add_new_viewer(question, user_info):
         """Добавляет новый просмотр в вопрос или создаёт вопрос с просмотром,
