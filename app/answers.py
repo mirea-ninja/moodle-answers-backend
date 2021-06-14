@@ -42,7 +42,7 @@ class AnswersDB:
             [type]: [description]
         """
         # вариант вопроса с одним возможным ответом
-        if question_type == 'shortanswer' or question_type == 'multichoice' or question_type == 'truefalse':
+        if question_type == 'shortanswer' or question_type == 'numerical' or question_type == 'multichoice' or question_type == 'truefalse':
             # удаляем другие наши ответы и добавляем новый
             questions_collection.update_one(
                 {'question': question, 'answers.users': user_info},
@@ -72,7 +72,7 @@ class AnswersDB:
                     {'$push': {'answers.$.users': user_info}}, {"_id": 0},
                     return_document=ReturnDocument.AFTER)
                 return result
-
+        
     @staticmethod
     def add_new_viewer(question, user_info):
         """Добавляет новый просмотр в вопрос или создаёт вопрос с просмотром,
