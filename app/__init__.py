@@ -13,6 +13,6 @@ app = Flask(__name__)
 app.debug = True
 app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024
 
-sockets = SocketIO(app, cors_allowed_origins="http://oniel.beget.tech")
+sockets = SocketIO(app, cors_allowed_origins="*")
 
 from . import answers, routes
