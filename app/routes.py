@@ -38,7 +38,12 @@ def view_question(message):
             question.replace('Вы можете помочь развитию проекта, подтвердив правильный ответ (нужно нажать  на правильный ответ)Впишите суда свой ответ, если его нет внизу. Затем нажмите на пустое место рядом с полем и ответ сохранится. Пожалуйста, опишите ответ словами, не вставляйте буквы или номера ответов, они каждый раз меняются.', '')
             data = AnswersDB.add_new_viewer(question, user_info)
             result['data'].append(data)
-
+        
+            result = questions_collection.find_one(
+                {'question': question}, {"_id": 0},
+                session=session
+            )
+            sockets.emit('update_answers', result, to=room)
         sockets.emit('update_viewers', result, to=room)
 
 
