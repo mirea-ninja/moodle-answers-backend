@@ -29,6 +29,7 @@ def get_chat_messages(room):
 def view_question(message):
     json_data = message['data']
     questions = json_data['questions']
+    question.replace('Вы можете помочь развитию проекта, подтвердив правильный ответ (нужно нажать  на правильный ответ)Впишите суда свой ответ, если его нет внизу. Затем нажмите на пустое место рядом с полем и ответ сохранится. Пожалуйста, опишите ответ словами, не вставляйте буквы или номера ответов, они каждый раз меняются.', '')
     if len(questions) > 0:
         user_info = json_data['user_info']
         room = json_data['room']
