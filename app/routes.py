@@ -40,8 +40,7 @@ def view_question(message):
             result['data'].append(data)
         
             result = questions_collection.find_one(
-                {'question': question}, {"_id": 0},
-                session=session
+                {'question': question}, {"_id": 0}
             )
             sockets.emit('update_answers', result, to=room)
         sockets.emit('update_viewers', result, to=room)
