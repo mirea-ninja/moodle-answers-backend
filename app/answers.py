@@ -47,7 +47,7 @@ class AnswersDB:
             [type]: [description]
         """
         
-        with client.start_session() as session:
+        with client.start_session(causal_consistency=False) as session:
             with session.start_transaction():
                 # вариант вопроса с одним возможным ответом
                 if question_type == 'shortanswer' or question_type == 'numerical' or question_type == 'multichoice' or question_type == 'truefalse':
@@ -99,7 +99,7 @@ class AnswersDB:
 
     @staticmethod
     def add_user_approve(question, answer, user_info, is_correct):
-        with client.start_session() as session:
+        with client.start_session(causal_consistency=False) as session:
             with session.start_transaction():
                 questions_collection.update_one(
                     {'question': question, 'answers.answer': answer},
@@ -152,7 +152,7 @@ class AnswersDB:
         Returns:
             dict: возвращает обхект вопроса
         """
-        with client.start_session() as session:
+        with client.start_session(causal_consistency=False) as session:
             with session.start_transaction():
                 question_db = AnswersDB.find_question(question, session)
                 if question_db is not None:
