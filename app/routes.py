@@ -39,10 +39,10 @@ def view_question(message):
             data = AnswersDB.add_new_viewer(question, user_info)
             result['data'].append(data)
         
-            result = questions_collection.find_one(
+            result_question = questions_collection.find_one(
                 {'question': question}, {"_id": 0}
             )
-            sockets.emit('update_answers', result, to=room)
+            sockets.emit('update_answers', result_question, to=room)
         sockets.emit('update_viewers', result, to=room)
 
 
