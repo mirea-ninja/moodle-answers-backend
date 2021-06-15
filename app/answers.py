@@ -80,6 +80,7 @@ class AnswersDB:
                             return_document=ReturnDocument.AFTER, session=session
                         )
                     else:
+                        # если пользователь не отпралял этот вариант ответа
                         if AnswersDB.is_user_send_answer(question, answer[0], user_info, session) is False:
                             if AnswersDB.find_question_by_ans(question, answer[0], session) is None:
                                 result = questions_collection.find_one_and_update(
@@ -93,6 +94,7 @@ class AnswersDB:
                                     {'$push': {'answers.$.users': user_info}}, {"_id": 0},
                                     return_document=ReturnDocument.AFTER, session=session
                                 )
+                            
                     if result is None:
                         return AnswersDB.find_question(question, session)
                     return result
@@ -170,13 +172,17 @@ class AnswersDB:
 
     @staticmethod
     def is_user_send_answer(question, answer, user_info, session):
-        find = questions_collection.find_one(
-            {'question': question, "answers.answer": answer, "answers.users": user_info},
+        question = questions_collection.find_one(
+            {'question': question},
             session=session
         )
+        
+        for answer_ in question['answers']:
+            if answer_['answer'] == answer:
+                for user in answer_['users']:
+                    if user == user_info:
+                        return True
 
-        if find is not None:
-            return True
         return False
 
     @staticmethod
