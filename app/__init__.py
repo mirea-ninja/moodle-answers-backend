@@ -6,7 +6,7 @@ import pymongo
 from pymongo.read_concern import ReadConcern
 from pymongo.write_concern import WriteConcern
 
-client = pymongo.MongoClient('mongodb+srv://msiet5wVdc5fh3AS:msiet5wVdc5fh3AS@schedulebot.xredu.mongodb.net/ScheduleBot?retryWrites=true&w=majority')
+client = pymongo.MongoClient('connection-string-here')
 
 database = client['answers_script']
 
