@@ -1,8 +1,8 @@
-from flask import Flask, json, make_response, request, jsonify, Markup
+from flask import Markup
 from flask_socketio import join_room, leave_room
-from pymongo import ReturnDocument
 from . import sockets, questions_collection, chat_collection
 from .answers import AnswersDB
+from datetime import datetime
 
 
 @sockets.on('chat')
@@ -55,6 +55,9 @@ def add_answer(data):
 
 @sockets.on('add_approve')
 def ans_approve(data):
+    if isinstance(data['answer'], list):
+        if len(data['answer']) == 2:
+            data['answer'] = 0
     result = AnswersDB.add_user_approve(
         data['question'], data['answer'], data['user_info'], data['is_correct'])
     sockets.emit('update_answers', result, to=data['room'])
