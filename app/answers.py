@@ -1,7 +1,5 @@
 from pymongo import ReturnDocument
 from . import client, questions_collection
-from pymongo.read_concern import ReadConcern
-from pymongo.write_concern import WriteConcern
 
 class AnswersDB:
     @staticmethod
@@ -47,99 +45,97 @@ class AnswersDB:
             [type]: [description]
         """
         
-        with client.start_session(causal_consistency=False) as session:
-            with session.start_transaction():
-                # вариант вопроса с одним возможным ответом
-                if question_type == 'shortanswer' or question_type == 'numerical' or question_type == 'multichoice' or question_type == 'truefalse':
-                    # удаляем другие наши ответы и добавляем новый
-                    questions_collection.update_many(
-                        {'question': question, 'answers.users': user_info},
-                        {'$pull': {'answers.$.users': user_info}}, 
-                        session=session
-                    )
-                    
-                    if question_type == 'shortanswer' or question_type == 'numerical':
-                        AnswersDB.delete_empty_answers(question, session)
+        with client.start_session(causal_consistency=True) as session:
+            # вариант вопроса с одним возможным ответом
+            if question_type == 'shortanswer' or question_type == 'numerical' or question_type == 'multichoice' or question_type == 'truefalse':
+                # удаляем другие наши ответы и добавляем новый
+                questions_collection.update_many(
+                    {'question': question, 'answers.users': user_info},
+                    {'$pull': {'answers.$.users': user_info}}, 
+                    session=session
+                )
+                
+                if question_type == 'shortanswer' or question_type == 'numerical':
+                    AnswersDB.delete_empty_answers(question, session)
 
-                    if AnswersDB.find_question_by_ans(question, answer, session) is None:
-                        return questions_collection.find_one_and_update(
-                            {'question': question}, {'$push': {'answers': {'answer': answer, 'users': [user_info], 'correct': [], 'not_correct': []}}},
-                            {"_id": 0}, return_document=ReturnDocument.AFTER, session=session)
-                    else:
-                        return questions_collection.find_one_and_update(
-                            {'question': question, 'answers.answer': answer},
-                            {'$push': {'answers.$.users': user_info}}, {"_id": 0},
-                            return_document=ReturnDocument.AFTER, session=session)
+                if AnswersDB.find_question_by_ans(question, answer, session) is None:
+                    return questions_collection.find_one_and_update(
+                        {'question': question}, {'$push': {'answers': {'answer': answer, 'users': [user_info], 'correct': [], 'not_correct': []}}},
+                        {"_id": 0}, return_document=ReturnDocument.AFTER, session=session)
+                else:
+                    return questions_collection.find_one_and_update(
+                        {'question': question, 'answers.answer': answer},
+                        {'$push': {'answers.$.users': user_info}}, {"_id": 0},
+                        return_document=ReturnDocument.AFTER, session=session)
+                    
+            elif question_type == 'multichoice_checkbox':
+                result = None
+                if answer[1] is False:
+                    result = questions_collection.find_one_and_update(
+                        {'question': question, 'answers.answer': answer[0]},
+                        {'$pull': {'answers.$.users': user_info}}, {"_id": 0},
+                        return_document=ReturnDocument.AFTER, session=session
+                    )
+                else:
+                    # если пользователь не отпралял этот вариант ответа
+                    if AnswersDB.is_user_send_answer(question, answer[0], user_info, session) is False:
+                        if AnswersDB.find_question_by_ans(question, answer[0], session) is None:
+                            result = questions_collection.find_one_and_update(
+                                {'question': question}, 
+                                {'$push': {'answers': {'answer': answer[0], 'users': [user_info], 'correct': [], 'not_correct': []}}}, 
+                                {"_id": 0}, return_document=ReturnDocument.AFTER, session=session
+                            )
+                        else:
+                            result = questions_collection.find_one_and_update(
+                                {'question': question, 'answers.answer': answer[0]},
+                                {'$push': {'answers.$.users': user_info}}, {"_id": 0},
+                                return_document=ReturnDocument.AFTER, session=session
+                            )
                         
-                elif question_type == 'multichoice_checkbox':
-                    result = None
-                    if answer[1] is False:
-                        result = questions_collection.find_one_and_update(
-                            {'question': question, 'answers.answer': answer[0]},
-                            {'$pull': {'answers.$.users': user_info}}, {"_id": 0},
-                            return_document=ReturnDocument.AFTER, session=session
-                        )
-                    else:
-                        # если пользователь не отпралял этот вариант ответа
-                        if AnswersDB.is_user_send_answer(question, answer[0], user_info, session) is False:
-                            if AnswersDB.find_question_by_ans(question, answer[0], session) is None:
-                                result = questions_collection.find_one_and_update(
-                                    {'question': question}, 
-                                    {'$push': {'answers': {'answer': answer[0], 'users': [user_info], 'correct': [], 'not_correct': []}}}, 
-                                    {"_id": 0}, return_document=ReturnDocument.AFTER, session=session
-                                )
-                            else:
-                                result = questions_collection.find_one_and_update(
-                                    {'question': question, 'answers.answer': answer[0]},
-                                    {'$push': {'answers.$.users': user_info}}, {"_id": 0},
-                                    return_document=ReturnDocument.AFTER, session=session
-                                )
-                            
-                    if result is None:
-                        return AnswersDB.find_question(question, session)
-                    return result
+                if result is None:
+                    return AnswersDB.find_question(question, session)
+                return result
 
     @staticmethod
     def add_user_approve(question, answer, user_info, is_correct):
-        with client.start_session(causal_consistency=False) as session:
-            with session.start_transaction():
-                questions_collection.update_one(
-                    {'question': question, 'answers.answer': answer},
-                    {'$pull': {'answers.$.correct': user_info}}, 
-                    session=session
-                )
-                questions_collection.update_one(
-                    {'question': question, 'answers.answer': answer},
-                    {'$pull': {'answers.$.not_correct': user_info}}, 
-                    session=session
-                )
+        with client.start_session(causal_consistency=True) as session:
+            questions_collection.update_one(
+                {'question': question, 'answers.answer': answer},
+                {'$pull': {'answers.$.correct': user_info}}, 
+                session=session
+            )
+            questions_collection.update_one(
+                {'question': question, 'answers.answer': answer},
+                {'$pull': {'answers.$.not_correct': user_info}}, 
+                session=session
+            )
 
-                if is_correct:
-                    if AnswersDB.find_question_by_ans(question, answer, session) is None:
-                        return questions_collection.find_one_and_update(
-                            {'question': question},
-                            {'$push': {'answers': {'answer': answer, 'users': [], 'correct': [user_info], 'not_correct': []}}}, {"_id": 0},
-                            return_document=ReturnDocument.AFTER, session=session
-                        )
-                    else:
-                        return questions_collection.find_one_and_update(
-                            {'question': question, 'answers.answer': answer},
-                            {'$push': {'answers.$.correct': user_info}}, {"_id": 0},
-                            return_document=ReturnDocument.AFTER, session=session
-                        )
+            if is_correct:
+                if AnswersDB.find_question_by_ans(question, answer, session) is None:
+                    return questions_collection.find_one_and_update(
+                        {'question': question},
+                        {'$push': {'answers': {'answer': answer, 'users': [], 'correct': [user_info], 'not_correct': []}}}, {"_id": 0},
+                        return_document=ReturnDocument.AFTER, session=session
+                    )
                 else:
-                    if AnswersDB.find_question_by_ans(question, answer, session) is None:
-                        return questions_collection.find_one_and_update(
-                            {'question': question},
-                            {'$push': {'answers': {'answer': answer, 'users': [], 'correct': [], 'not_correct': [user_info]}}}, {"_id": 0},
-                            return_document=ReturnDocument.AFTER, session=session
-                        )
-                    else:
-                        return questions_collection.find_one_and_update(
-                            {'question': question, 'answers.answer': answer},
-                            {'$push': {'answers.$.not_correct': user_info}}, {"_id": 0},
-                            return_document=ReturnDocument.AFTER, session=session
-                        )
+                    return questions_collection.find_one_and_update(
+                        {'question': question, 'answers.answer': answer},
+                        {'$push': {'answers.$.correct': user_info}}, {"_id": 0},
+                        return_document=ReturnDocument.AFTER, session=session
+                    )
+            else:
+                if AnswersDB.find_question_by_ans(question, answer, session) is None:
+                    return questions_collection.find_one_and_update(
+                        {'question': question},
+                        {'$push': {'answers': {'answer': answer, 'users': [], 'correct': [], 'not_correct': [user_info]}}}, {"_id": 0},
+                        return_document=ReturnDocument.AFTER, session=session
+                    )
+                else:
+                    return questions_collection.find_one_and_update(
+                        {'question': question, 'answers.answer': answer},
+                        {'$push': {'answers.$.not_correct': user_info}}, {"_id": 0},
+                        return_document=ReturnDocument.AFTER, session=session
+                    )
 
                 
     @staticmethod
@@ -154,21 +150,20 @@ class AnswersDB:
         Returns:
             dict: возвращает обхект вопроса
         """
-        with client.start_session(causal_consistency=False) as session:
-            with session.start_transaction():
-                question_db = AnswersDB.find_question(question, session)
-                if question_db is not None:
-                    if user_info not in question_db['viewers']:
-                        document = questions_collection.find_one_and_update(
-                            {'question': question}, {'$push': {'viewers': user_info}},
-                            {"_id": 0}, return_document=ReturnDocument.AFTER, session=session
-                        )
-                        return document
-                    else:
-                        return question_db
+        with client.start_session(causal_consistency=True) as session:
+            question_db = AnswersDB.find_question(question, session)
+            if question_db is not None:
+                if user_info not in question_db['viewers']:
+                    document = questions_collection.find_one_and_update(
+                        {'question': question}, {'$push': {'viewers': user_info}},
+                        {"_id": 0}, return_document=ReturnDocument.AFTER, session=session
+                    )
+                    return document
                 else:
-                    AnswersDB.add_new_question(question, [], [user_info], session)
-                    return {'question': question, 'answers': [], 'viewers': [user_info]}
+                    return question_db
+            else:
+                AnswersDB.add_new_question(question, [], [user_info], session)
+                return {'question': question, 'answers': [], 'viewers': [user_info]}
 
     @staticmethod
     def is_user_send_answer(question, answer, user_info, session):
