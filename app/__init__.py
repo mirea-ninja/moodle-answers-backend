@@ -1,17 +1,16 @@
-from flask import Flask
-from flask_socketio import SocketIO
+import asyncio
+from aiohttp import web
+import socketio
 import pymongo
 
-client = pymongo.MongoClient('connection-string-here')
+client = pymongo.MongoClient('mongodb://127.0.0.1:27017')
 
 database = client['answers_script']
 questions_collection = database['questions']
 chat_collection = database['chat']
 
-app = Flask(__name__)
-app.debug = True
-app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024
-
-sockets = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+sio = socketio.AsyncServer(async_mode='aiohttp', cors_allowed_origins='*')
+app = web.Application()
+sio.attach(app)
 
 from . import answers, routes
