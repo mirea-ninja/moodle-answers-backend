@@ -132,8 +132,8 @@ class AnswersDB:
                                 return_document=ReturnDocument.AFTER, session=session)
                     else:
                         # если значение у ответа = none, то пользователь снял свой выбор.
-                        questions_collection.update_one(
-                            {'question': question, 'answers.subquestion': subquestion, 'answers.answer': answer_text},
+                        questions_collection.update_many(
+                            {'question': question, 'answers.subquestion': subquestion},
                             {'$pull': {'answers.$.users': user_info}}, 
                             session=session
                         )
