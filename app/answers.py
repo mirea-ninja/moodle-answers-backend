@@ -12,10 +12,20 @@ class AnswersDB:
 
     @staticmethod
     def find_question_by_ans(question, answer, session):
-        result = questions_collection.find_one(
-            {'question': question, 'answers.answer': answer}, {"_id": 0},
-            session=session
-        )
+        # для типа вопроса 'match'
+        if 'subquestion' in answer:
+            result = questions_collection.find_one(
+                {'question': question, 
+                 'answers.subquestion': answer['subquestion'], 
+                 'answers.answer': answer['answer']
+                 }, {"_id": 0},
+                session=session
+            )
+        else:
+            result = questions_collection.find_one(
+                {'question': question, 'answers.answer': answer}, {"_id": 0},
+                session=session
+            )
         return result
 
     @staticmethod
@@ -91,10 +101,35 @@ class AnswersDB:
                                 {'$push': {'answers.$.users': user_info}}, {"_id": 0},
                                 return_document=ReturnDocument.AFTER, session=session
                             )
-                        
+                    
                 if result is None:
                     return AnswersDB.find_question(question, session)
                 return result
+            
+            elif question_type == 'match':
+                subquestion = answer[0]
+                answer_text = answer[1]
+                
+                 # если пользователь точно такой ответ не отправлял
+                if not AnswersDB.is_user_send_answer(question, answer, user_info, session):
+                    # удаляем другие ответы пользователя на такой subquestion
+                    questions_collection.update_many(
+                        {'question': question, 'answers.users': user_info, 'answers.subquestion': subquestion},
+                        {'$pull': {'answers.$.users': user_info}}, 
+                        session=session
+                    )
+                    AnswersDB.delete_empty_answers(question, session)
+                    match_answer = {'subquestion': subquestion, 'answer': answer_text}
+                    if AnswersDB.find_question_by_ans(question, match_answer, session) is None:
+                        return questions_collection.find_one_and_update(
+                            {'question': question}, {'$push': {'answers': {'subquestion': subquestion, 'answer': answer_text, 'users': [user_info], 'correct': [], 'not_correct': []}}},
+                            {"_id": 0}, return_document=ReturnDocument.AFTER, session=session)
+                    else:
+                        return questions_collection.find_one_and_update(
+                            {'question': question, 'answers.subquestion': subquestion, 'answers.answer': answer_text},
+                            {'$push': {'answers.$.users': user_info}}, {"_id": 0},
+                            return_document=ReturnDocument.AFTER, session=session)
+                    
 
     @staticmethod
     def add_user_approve(question, answer, user_info, is_correct):
@@ -173,10 +208,16 @@ class AnswersDB:
         )
         
         for answer_ in question['answers']:
-            if answer_['answer'] == answer:
-                for user in answer_['users']:
-                    if user == user_info:
+            # для типа вопроса 'match'
+            if 'subquestion' in answer_:
+                if answer_['subquestion'] == answer[0] and answer_['answer'] == answer[1]:
+                    if user_info in answer_['users']:
                         return True
+            else:
+                if answer_['answer'] == answer:
+                    for user in answer_['users']:
+                        if user == user_info:
+                            return True
 
         return False
 
