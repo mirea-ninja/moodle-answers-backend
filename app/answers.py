@@ -130,6 +130,15 @@ class AnswersDB:
                                 {'question': question, 'answers.subquestion': subquestion, 'answers.answer': answer_text},
                                 {'$push': {'answers.$.users': user_info}}, {"_id": 0},
                                 return_document=ReturnDocument.AFTER, session=session)
+                    else:
+                        # если значение у ответа = none, то пользователь снял свой выбор.
+                        questions_collection.update_one(
+                            {'question': question, 'answers.subquestion': subquestion, 'answers.answer': answer_text},
+                            {'$pull': {'answers.$.users': user_info}}, 
+                            session=session
+                        )
+                        AnswersDB.delete_empty_answers(question, session)
+                        return AnswersDB.find_question(question, session)
                     
 
     @staticmethod
