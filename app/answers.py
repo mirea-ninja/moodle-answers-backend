@@ -1,3 +1,4 @@
+from re import sub
 from pymongo import ReturnDocument
 from . import client, questions_collection
 
@@ -109,26 +110,26 @@ class AnswersDB:
             elif question_type == 'match':
                 subquestion = answer[0]
                 answer_text = answer[1]
-                
-                 # если пользователь точно такой ответ не отправлял
-                if not AnswersDB.is_user_send_answer(question, answer, user_info, session):
-                    # удаляем другие ответы пользователя на такой subquestion
-                    questions_collection.update_many(
-                        {'question': question, 'answers.users': user_info, 'answers.subquestion': subquestion},
-                        {'$pull': {'answers.$.users': user_info}}, 
-                        session=session
-                    )
-                    AnswersDB.delete_empty_answers(question, session)
-                    match_answer = {'subquestion': subquestion, 'answer': answer_text}
-                    if AnswersDB.find_question_by_ans(question, match_answer, session) is None:
-                        return questions_collection.find_one_and_update(
-                            {'question': question}, {'$push': {'answers': {'subquestion': subquestion, 'answer': answer_text, 'users': [user_info], 'correct': [], 'not_correct': []}}},
-                            {"_id": 0}, return_document=ReturnDocument.AFTER, session=session)
-                    else:
-                        return questions_collection.find_one_and_update(
-                            {'question': question, 'answers.subquestion': subquestion, 'answers.answer': answer_text},
-                            {'$push': {'answers.$.users': user_info}}, {"_id": 0},
-                            return_document=ReturnDocument.AFTER, session=session)
+                if answer_text != 'none' and answer_text is not None:
+                    # если пользователь точно такой ответ не отправлял
+                    if not AnswersDB.is_user_send_answer(question, answer, user_info, session):
+                        # удаляем другие ответы пользователя на такой subquestion
+                        questions_collection.update_many(
+                            {'question': question, 'answers.subquestion': subquestion},
+                            {'$pull': {'answers.$.users': user_info}}, 
+                            session=session
+                        )
+                        AnswersDB.delete_empty_answers(question, session)
+                        match_answer = {'subquestion': subquestion, 'answer': answer_text}
+                        if AnswersDB.find_question_by_ans(question, match_answer, session) is None:
+                            return questions_collection.find_one_and_update(
+                                {'question': question}, {'$push': {'answers': {'subquestion': subquestion, 'answer': answer_text, 'users': [user_info], 'correct': [], 'not_correct': []}}},
+                                {"_id": 0}, return_document=ReturnDocument.AFTER, session=session)
+                        else:
+                            return questions_collection.find_one_and_update(
+                                {'question': question, 'answers.subquestion': subquestion, 'answers.answer': answer_text},
+                                {'$push': {'answers.$.users': user_info}}, {"_id": 0},
+                                return_document=ReturnDocument.AFTER, session=session)
                     
 
     @staticmethod
