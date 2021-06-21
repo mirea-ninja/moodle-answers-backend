@@ -116,7 +116,9 @@ class AnswersDB:
                         # удаляем другие ответы пользователя на такой subquestion
                         questions_collection.update_many(
                             {'question': question, 'answers.subquestion': subquestion},
-                            {'$pull': {'answers.$.users': user_info}}, 
+                            {'$pull': {'answers.$[e].users': user_info}}, 
+                            array_filters=[ { "e.subquestion": { '$eq': subquestion }}],
+                            upsert=False,
                             session=session
                         )
                         AnswersDB.delete_empty_answers(question, session)
