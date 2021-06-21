@@ -111,7 +111,8 @@ async def add_answer(sid, data):
     """
     result = AnswersDB.add_user_answer(
         data['question'], data['answer'], data['user_info'], data['question_type'])
-    await sio.emit('update_answers', result, room=data['room'])
+    if result is not None:
+        await sio.emit('update_answers', result, room=data['room'])
 
 
 @sio.event
@@ -155,7 +156,8 @@ async def add_approve(sid, data):
             
     result = AnswersDB.add_user_approve(
         data['question'], data['answer'], data['user_info'], data['is_correct'])
-    await sio.emit('update_answers', result, room=data['room'])
+    if result is not None:
+        await sio.emit('update_answers', result, room=data['room'])
 
 
 @sio.event
