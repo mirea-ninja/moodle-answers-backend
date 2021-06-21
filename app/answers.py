@@ -17,11 +17,16 @@ class AnswersDB:
         if 'subquestion' in answer:
             result = questions_collection.find_one(
                 {'question': question, 
-                 'answers.subquestion': answer['subquestion'], 
-                 'answers.answer': answer['answer']
+                 'answers.subquestion': answer['subquestion']
                  }, {"_id": 0},
                 session=session
             )
+
+            if result is not None:
+                for answer_ in result['answers']:
+                    if answer_['subquestion'] == answer['subquestion'] and answer_['answer'] == answer['answer']:
+                        return result
+                result = None
         else:
             result = questions_collection.find_one(
                 {'question': question, 'answers.answer': answer}, {"_id": 0},
@@ -129,8 +134,10 @@ class AnswersDB:
                                 {"_id": 0}, return_document=ReturnDocument.AFTER, session=session)
                         else:
                             return questions_collection.find_one_and_update(
-                                {'question': question, 'answers.subquestion': subquestion, 'answers.answer': answer_text},
-                                {'$push': {'answers.$.users': user_info}}, {"_id": 0},
+                                {'question': question, 'answers.subquestion': subquestion},
+                                {'$push': {'answers.$[e].users': user_info}}, 
+                                {"_id": 0},
+                                array_filters=[ { "e.subquestion": { '$eq': subquestion }, "e.answer": { '$eq': answer_text }}],
                                 return_document=ReturnDocument.AFTER, session=session)
                 else:
                     # если значение у ответа = none, то пользователь снял свой выбор.
@@ -218,7 +225,6 @@ class AnswersDB:
             {'question': question},
             session=session
         )
-        
         for answer_ in question['answers']:
             # для типа вопроса 'match'
             if 'subquestion' in answer_:
@@ -237,7 +243,7 @@ class AnswersDB:
     def delete_empty_answers(question, session):
         questions_collection.update_many(
             {'question': question, 'answers.users': {'$size': 0}},
-            {'$set': {'answers.$': None}},
+            {'$set': {'answedrs.$': None}},
             session=session
         )
         questions_collection.update_many(
