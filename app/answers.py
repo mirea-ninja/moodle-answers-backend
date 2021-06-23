@@ -243,7 +243,7 @@ class AnswersDB:
     def delete_empty_answers(question, session):
         questions_collection.update_many(
             {'question': question, 'answers.users': {'$size': 0}},
-            {'$set': {'answedrs.$': None}},
+            {'$set': {'answers.$': None}},
             session=session
         )
         questions_collection.update_many(
