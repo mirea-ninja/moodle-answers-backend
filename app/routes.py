@@ -152,9 +152,8 @@ async def add_approve(sid, data):
     # у checkbox-подобных типов отправляется ещё и состояние
     # выбора этого ответа (checked), поэтому берём только
     # сам текст ответа
-    if isinstance(data['answer'], list):
-        if len(data['answer']) == 2:
-            data['answer'] = 0
+    if isinstance(data['answer'], list) and len(data['answer']) == 2:
+        data['answer'] = 0
 
     result = await AnswersDB.add_user_approve(await get_database(),
                                         data['question'], data['answer'], data['user_info'], data['is_correct'])

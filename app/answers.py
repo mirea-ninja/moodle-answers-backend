@@ -66,7 +66,12 @@ class AnswersDB:
 
         async with await conn.start_session(causal_consistency=True) as session:
             # вариант вопроса с одним возможным ответом
-            if question_type == 'shortanswer' or question_type == 'numerical' or question_type == 'multichoice' or question_type == 'truefalse':
+            if question_type in [
+                'shortanswer',
+                'numerical',
+                'multichoice',
+                'truefalse',
+            ]:
                 # удаляем другие наши ответы и добавляем новый
                 await conn[DATABASE_NAME][QUESTIONS_COLLECTION_NAME].update_many(
                     {'question': question, 'answers.users': user_info},
@@ -74,7 +79,7 @@ class AnswersDB:
                     session=session
                 )
 
-                if question_type == 'shortanswer' or question_type == 'numerical':
+                if question_type in ['shortanswer', 'numerical']:
                     await AnswersDB.delete_empty_answers(conn, question, session)
 
                 if await AnswersDB.find_question_by_ans(conn, question, answer, session) is None:
@@ -96,24 +101,40 @@ class AnswersDB:
                         {'$pull': {'answers.$.users': user_info}}, {"_id": 0},
                         return_document=ReturnDocument.AFTER, session=session
                     )
-                else:
-                    # если пользователь не отпралял этот вариант ответа
-                    if await AnswersDB.is_user_send_answer(conn, question, answer[0], user_info, session) is False:
-                        if await AnswersDB.find_question_by_ans(conn, question, answer[0], session) is None:
-                            result = await conn[DATABASE_NAME][QUESTIONS_COLLECTION_NAME].find_one_and_update(
-                                {'question': question},
-                                {'$push': {'answers': {'answer': answer[0], 'users': [
-                                    user_info], 'correct': [], 'not_correct': []}}},
-                                {"_id": 0}, return_document=ReturnDocument.AFTER, session=session
-                            )
-                        else:
-                            result = await conn[DATABASE_NAME][QUESTIONS_COLLECTION_NAME].find_one_and_update(
-                                {'question': question,
-                                    'answers.answer': answer[0]},
-                                {'$push': {'answers.$.users': user_info}}, {
-                                    "_id": 0},
-                                return_document=ReturnDocument.AFTER, session=session
-                            )
+                elif await AnswersDB.is_user_send_answer(conn, question, answer[0], user_info, session) is False:
+                    result = (
+                        await conn[DATABASE_NAME][
+                            QUESTIONS_COLLECTION_NAME
+                        ].find_one_and_update(
+                            {'question': question},
+                            {
+                                '$push': {
+                                    'answers': {
+                                        'answer': answer[0],
+                                        'users': [user_info],
+                                        'correct': [],
+                                        'not_correct': [],
+                                    }
+                                }
+                            },
+                            {"_id": 0},
+                            return_document=ReturnDocument.AFTER,
+                            session=session,
+                        )
+                        if await AnswersDB.find_question_by_ans(
+                            conn, question, answer[0], session
+                        )
+                        is None
+                        else await conn[DATABASE_NAME][
+                            QUESTIONS_COLLECTION_NAME
+                        ].find_one_and_update(
+                            {'question': question, 'answers.answer': answer[0]},
+                            {'$push': {'answers.$.users': user_info}},
+                            {"_id": 0},
+                            return_document=ReturnDocument.AFTER,
+                            session=session,
+                        )
+                    )
 
                 if result is None:
                     return await AnswersDB.find_question(conn, question, session)
@@ -176,33 +197,53 @@ class AnswersDB:
             )
 
             if is_correct:
-                if await AnswersDB.find_question_by_ans(conn, question, answer, session) is None:
-                    return await conn[DATABASE_NAME][QUESTIONS_COLLECTION_NAME].find_one_and_update(
+                return (
+                    await conn[DATABASE_NAME][
+                        QUESTIONS_COLLECTION_NAME
+                    ].find_one_and_update(
                         {'question': question},
-                        {'$push': {'answers': {'answer': answer, 'users': [], 'correct': [
-                            user_info], 'not_correct': []}}}, {"_id": 0},
-                        return_document=ReturnDocument.AFTER, session=session
+                        {
+                            '$push': {
+                                'answers': {
+                                    'answer': answer,
+                                    'users': [],
+                                    'correct': [user_info],
+                                    'not_correct': [],
+                                }
+                            }
+                        },
+                        {"_id": 0},
+                        return_document=ReturnDocument.AFTER,
+                        session=session,
                     )
-                else:
-                    return await conn[DATABASE_NAME][QUESTIONS_COLLECTION_NAME].find_one_and_update(
+                    if await AnswersDB.find_question_by_ans(
+                        conn, question, answer, session
+                    )
+                    is None
+                    else await conn[DATABASE_NAME][
+                        QUESTIONS_COLLECTION_NAME
+                    ].find_one_and_update(
                         {'question': question, 'answers.answer': answer},
-                        {'$push': {'answers.$.correct': user_info}}, {"_id": 0},
-                        return_document=ReturnDocument.AFTER, session=session
+                        {'$push': {'answers.$.correct': user_info}},
+                        {"_id": 0},
+                        return_document=ReturnDocument.AFTER,
+                        session=session,
                     )
+                )
+
+            if await AnswersDB.find_question_by_ans(conn, question, answer, session) is None:
+                return await conn[DATABASE_NAME][QUESTIONS_COLLECTION_NAME].find_one_and_update(
+                    {'question': question},
+                    {'$push': {'answers': {'answer': answer, 'users': [],
+                                           'correct': [], 'not_correct': [user_info]}}}, {"_id": 0},
+                    return_document=ReturnDocument.AFTER, session=session
+                )
             else:
-                if await AnswersDB.find_question_by_ans(conn, question, answer, session) is None:
-                    return await conn[DATABASE_NAME][QUESTIONS_COLLECTION_NAME].find_one_and_update(
-                        {'question': question},
-                        {'$push': {'answers': {'answer': answer, 'users': [],
-                                               'correct': [], 'not_correct': [user_info]}}}, {"_id": 0},
-                        return_document=ReturnDocument.AFTER, session=session
-                    )
-                else:
-                    return await conn[DATABASE_NAME][QUESTIONS_COLLECTION_NAME].find_one_and_update(
-                        {'question': question, 'answers.answer': answer},
-                        {'$push': {'answers.$.not_correct': user_info}}, {"_id": 0},
-                        return_document=ReturnDocument.AFTER, session=session
-                    )
+                return await conn[DATABASE_NAME][QUESTIONS_COLLECTION_NAME].find_one_and_update(
+                    {'question': question, 'answers.answer': answer},
+                    {'$push': {'answers.$.not_correct': user_info}}, {"_id": 0},
+                    return_document=ReturnDocument.AFTER, session=session
+                )
 
     @staticmethod
     async def add_new_viewer(conn, question, user_info):
@@ -219,15 +260,14 @@ class AnswersDB:
         async with await conn.start_session(causal_consistency=True) as session:
             question_db = await AnswersDB.find_question(conn, question, session)
             if question_db is not None:
-                if user_info not in question_db['viewers']:
-                    document = await conn[DATABASE_NAME][QUESTIONS_COLLECTION_NAME].find_one_and_update(
-                        {'question': question}, {
-                            '$push': {'viewers': user_info}},
-                        {"_id": 0}, return_document=ReturnDocument.AFTER, session=session
-                    )
-                    return document
-                else:
+                if user_info in question_db['viewers']:
                     return question_db
+                document = await conn[DATABASE_NAME][QUESTIONS_COLLECTION_NAME].find_one_and_update(
+                    {'question': question}, {
+                        '$push': {'viewers': user_info}},
+                    {"_id": 0}, return_document=ReturnDocument.AFTER, session=session
+                )
+                return document
             else:
                 await AnswersDB.add_new_question(conn, question, [], [user_info], session)
                 return {'question': question, 'answers': [], 'viewers': [user_info]}
@@ -242,14 +282,16 @@ class AnswersDB:
             for answer_ in question['answers']:
                 # для типа вопроса 'match'
                 if 'subquestion' in answer_:
-                    if answer_['subquestion'] == answer[0] and answer_['answer'] == answer[1]:
-                        if user_info in answer_['users']:
+                    if (
+                        answer_['subquestion'] == answer[0]
+                        and answer_['answer'] == answer[1]
+                        and user_info in answer_['users']
+                    ):
+                        return True
+                elif answer_['answer'] == answer:
+                    for user in answer_['users']:
+                        if user == user_info:
                             return True
-                else:
-                    if answer_['answer'] == answer:
-                        for user in answer_['users']:
-                            if user == user_info:
-                                return True
 
         return False
 
